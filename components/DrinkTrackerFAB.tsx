@@ -786,7 +786,7 @@ export default function DrinkTrackerFAB({
     },
     [addDrink, verifying],
   );
-  function showVerifyDrinkPrompt(entry) {
+  function showVerifyDrinkPrompt(entry: DrinkEntry) {
     Alert.alert(
       "Verify your drink?",
       "Take a photo to check for signs of tampering or spoofing. If concerns are found, the drink will not be logged.",

@@ -6,6 +6,7 @@ require("dotenv").config();
 const authRoutes = require("./routes/drinklogs");
 const drinkRoutes = require("./routes/drinks");
 const drinkLogRoutes = require("./routes/drinklogs");
+const identifyDrinkRoutes = require("./routes/identifyDrink");
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(express.json({ limit: "10mb" })); // 10mb to handle base64 images from c
 app.use("/api/auth", authRoutes);
 app.use("/api/drinks", drinkRoutes);
 app.use("/api/drinklogs", drinkLogRoutes);
+app.use("/api/identifyDrink", identifyDrinkRoutes);
 
 // Health check
 app.get("/", (req, res) => {
@@ -24,8 +26,18 @@ app.get("/", (req, res) => {
 });
 
 // Connect to MongoDB
+const mongoUri = process.env.MONGODB_URI?.trim();
+if (!mongoUri) {
+  console.error("ERROR: MONGODB_URI environment variable is not set or is empty");
+  process.exit(1);
+}
+if (!mongoUri.startsWith("mongodb://") && !mongoUri.startsWith("mongodb+srv://")) {
+  console.error("ERROR: MONGODB_URI must start with 'mongodb://' or 'mongodb+srv://'");
+  console.error("Current value (first 50 chars):", mongoUri.substring(0, 50));
+  process.exit(1);
+}
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect(mongoUri)
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
