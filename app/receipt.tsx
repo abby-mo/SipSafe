@@ -26,11 +26,15 @@ const JaggedEdge = ({ position }: JaggedEdgeProps) => (
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      // Inside your return statement:
       <View style={styles.headerNav}>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtnContainer}>
           <Text style={styles.closeX}>✕</Text>
         </TouchableOpacity>
-        <Text style={styles.navTitle}>SUMMARY</Text>
+        
+        {/* Updated Title */}
+        <Text style={styles.navTitle}>LAST NIGHT'S POUR DECISIONS</Text>
+        
         <View style={{ width: 40 }} />
       </View>
 
@@ -100,6 +104,7 @@ const JaggedEdge = ({ position }: JaggedEdgeProps) => (
 }
 
 const styles = StyleSheet.create({
+  
   container: { flex: 1, backgroundColor: '#000' },
   scrollContent: { paddingTop: 50, paddingBottom: 60 },
   headerNav: { 
@@ -111,7 +116,14 @@ const styles = StyleSheet.create({
   },
   closeBtnContainer: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   closeX: { color: '#fff', fontSize: 28, fontWeight: '300' },
-  navTitle: { color: '#fff', fontFamily: 'RubikBold', fontSize: 16, letterSpacing: 2 },
+  navTitle: { 
+    color: '#fff', 
+    fontFamily: 'RubikGlitch', // Changed from RubikBold
+    fontSize: 20,              // Increased slightly for readability
+    letterSpacing: 1, 
+    textAlign: 'center',
+    flex: 1,                   // Ensures it stays centered between the buttons
+  },
   receiptContainer: { paddingHorizontal: 30, width: '100%' },
   
   receiptPaper: {
