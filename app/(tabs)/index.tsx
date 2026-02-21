@@ -47,7 +47,6 @@ function HomePageContent() {
             <Text style={styles.inputPillText}>How much did you drink?</Text>
           </View>
           <TouchableOpacity onPress={() => router.push("/profile")}>
-            <Text style={styles.navBtn}>Profile</Text>
           </TouchableOpacity>
         </View>
 
