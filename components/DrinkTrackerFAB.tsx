@@ -32,14 +32,21 @@
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, Platform, Alert, Animated, Dimensions, PanResponder,
-  ActivityIndicator,
-} from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import { analyzeDrinkForSpoofing } from "@/lib/drinkSpoofingDetection";
+import * as ImagePicker from "expo-image-picker";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert, Animated, Dimensions,
+  Modal,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 const { width: SW } = Dimensions.get("window");
 
