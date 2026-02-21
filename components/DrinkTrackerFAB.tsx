@@ -34,6 +34,9 @@
 
 import { analyzeDrinkForSpoofing } from "@/lib/drinkSpoofingDetection";
 // ...existing code...
+import { speakText } from "@/lib/elevenlabsTTS";
+import { verifyDrinkWithGemini } from "@/lib/geminiDrinkVerification";
+import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
@@ -49,7 +52,6 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-// ...existing code...
 
 const { width: SW } = Dimensions.get("window");
 
