@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const BASE_URL = "https://sipsafe-backend-fwdby.ondigitalocean.app";
+// const BASE_URL = "http://localhost:3000";
 
 // replace the URL above with your full DigitalOcean URL
 
