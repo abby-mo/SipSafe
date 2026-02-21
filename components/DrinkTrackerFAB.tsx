@@ -32,10 +32,20 @@
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { analyzeDrinkForSpoofing } from "@/lib/drinkSpoofingDetection";
+import * as ImagePicker from "expo-image-picker";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, Platform, Alert, Animated, Dimensions, PanResponder,
+  ActivityIndicator,
+  Alert, Animated, Dimensions,
+  Modal,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { api } from "@/constants/api";
@@ -271,9 +281,11 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
   const [open, setOpen]             = useState(false);
   const [drinks, setDrinks]         = useState<DrinkEntry[]>([]);
   const [bac, setBac]               = useState(0);
+  const [verifying, setVerifying]   = useState(false);
   const [waterNudge, setWaterNudge] = useState(false);
   const [sessionStart]              = useState(new Date());
   const [tick, setTick]             = useState(0);
+  const [verifying, setVerifying]   = useState(false);
 
   const pulse  = useRef(new Animated.Value(1)).current;
   const slideY = useRef(new Animated.Value(800)).current;
@@ -332,10 +344,48 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
     }).start();
   }, [open]);
 
+  const removeDrink = useCallback((id: string) => {
+    setDrinks((prev) => prev.filter((d) => d.id !== id));
+  }, []);
+
+  const promptVerifyDrink = useCallback(async (drinkIdToRevoke?: string) => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Camera access needed", "Allow camera access to verify your drink for tampering.", [{ text: "OK" }]);
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.8,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0]?.base64) return;
+
+    setVerifying(true);
+    try {
+      const analysis = await analyzeDrinkForSpoofing(
+        result.assets[0].base64,
+        (result.assets[0].mimeType as "image/jpeg" | "image/png") ?? "image/jpeg"
+      );
+      if (!analysis.safe && drinkIdToRevoke) {
+        removeDrink(drinkIdToRevoke);
+      }
+      const title = analysis.safe ? "✓ Drink looks OK" : "⚠ Possible concerns";
+      const body = analysis.safe
+        ? analysis.summary + (analysis.concerns.length > 0 ? `\n\n${analysis.concerns.join("\n")}` : "")
+        : (drinkIdToRevoke ? "Drink removed from log.\n\n" : "") + analysis.summary + (analysis.concerns.length > 0 ? `\n\n${analysis.concerns.join("\n")}` : "");
+      Alert.alert(title, body, [{ text: "OK" }]);
+    } finally {
+      setVerifying(false);
+    }
+  }, [removeDrink]);
+
   const addDrink = useCallback((dt: typeof DRINK_TYPES[number]) => {
     const entry: DrinkEntry = {
       id: Date.now().toString(),
-      type: dt.label, emoji: dt.emoji,
+      type: dt.label,
+      emoji: dt.emoji,
       standardDrinks: dt.standardDrinks,
       timestamp: new Date(),
     };
@@ -346,9 +396,82 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
     });
   }, []);
 
-  const removeDrink = useCallback((id: string) => {
-    setDrinks((prev) => prev.filter((d) => d.id !== id));
-  }, []);
+  const verifyAndAddDrink = useCallback(async (dt: typeof DRINK_TYPES[number]) => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Camera access needed",
+        "Allow camera access so Gemini can verify drink type, spoofing, and possible drugging signs.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.8,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0]?.base64 || verifying) return;
+
+    const mimeType = result.assets[0].mimeType;
+    const safeMimeType = mimeType === "image/png" || mimeType === "image/webp" ? mimeType : "image/jpeg";
+
+    setVerifying(true);
+    try {
+      const analysis = await verifyDrinkWithGemini(
+        result.assets[0].base64,
+        dt.label,
+        safeMimeType
+      );
+
+      await speakText(analysis.voiceMessage);
+
+      if (!analysis.allowed) {
+        const reasons: string[] = [];
+        if (!analysis.isExpectedDrinkMatch) {
+          reasons.push(`Expected ${dt.label}, but photo looked like ${analysis.matchedDrinkType}.`);
+        }
+        if (analysis.spoofingLikely) {
+          reasons.push("Possible spoofing/tampering indicators detected.");
+        }
+        if (analysis.druggingLikely) {
+          reasons.push("Possible drink spiking/drugging indicators detected.");
+        }
+        const details = [...reasons, ...analysis.concerns].join("\n");
+        Alert.alert(
+          "Verification failed",
+          `${analysis.summary}${details ? `\n\n${details}` : ""}\n\nDrink was not added.`,
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      addDrink(dt);
+      const extra = analysis.concerns.length > 0 ? `\n\nNotes:\n${analysis.concerns.join("\n")}` : "";
+      Alert.alert("Drink verified", `${analysis.summary}${extra}`, [{ text: "OK" }]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error.";
+      const friendly =
+        message.includes("model") || message.includes("404")
+          ? "Gemini model configuration failed. Try again after setting a valid Gemini model."
+          : "Gemini could not verify this drink right now. Please retake the photo.";
+      await speakText("Verification failed. I could not verify this drink.");
+      Alert.alert("Verification error", `${friendly}\n\nTechnical detail: ${message}`, [{ text: "OK" }]);
+    } finally {
+      setVerifying(false);
+    }
+  }, [addDrink, verifying]);
+    Alert.alert(
+      "Verify your drink?",
+      "Take a photo to check for signs of tampering or spoofing. If concerns are found, the drink will not be logged.",
+      [
+        { text: "Skip", style: "cancel" },
+        { text: "Take photo", onPress: () => promptVerifyDrink(entry.id) },
+      ]
+    );
+  }, [promptVerifyDrink]);
 
   const endSession = () =>
     Alert.alert("END SESSION", "Clear all drinks and reset BAC?", [
@@ -397,6 +520,13 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
       {/* ══ BOTTOM SHEET MODAL ══════════════════════════════════════════════ */}
       <Modal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
 
+        {verifying && (
+          <View style={shS.verifyingOverlay}>
+            <ActivityIndicator size="large" color={C.orange} />
+            <Text style={shS.verifyingTxt}>Analyzing drink...</Text>
+          </View>
+        )}
+
         {/* Dim backdrop — tap outside to close */}
         <TouchableOpacity style={shS.overlay} activeOpacity={1} onPress={() => setOpen(false)} />
 
@@ -416,6 +546,7 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
                 SIP<Text style={{ color:C.red }}>SAFE</Text>
                 <Text style={shS.titleSub}> TRACKER</Text>
               </Text>
+              {verifying && <Text style={shS.verifyStatus}>VERIFYING PHOTO WITH GEMINI...</Text>}
             </View>
             <TouchableOpacity style={shS.endBtn} onPress={endSession}>
               <Text style={shS.endBtnTxt}>END</Text>
@@ -455,8 +586,9 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
                 <TouchableOpacity
                   key={dt.label}
                   style={shS.drinkBtn}
-                  onPress={() => addDrink(dt)}
-                  activeOpacity={0.65}
+                  onPress={() => verifyAndAddDrink(dt)}
+                  activeOpacity={verifying ? 1 : 0.65}
+                  disabled={verifying}
                 >
                   <Text style={shS.drinkEmoji}>{dt.emoji}</Text>
                   <Text style={shS.drinkName}>{dt.label}</Text>
@@ -464,6 +596,17 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
                 </TouchableOpacity>
               ))}
             </View>
+
+            {drinks.length > 0 && (
+              <TouchableOpacity
+                style={[shS.verifyBtn, verifying && shS.verifyBtnDisabled]}
+                onPress={() => promptVerifyDrink()}
+                disabled={verifying}
+                activeOpacity={0.8}
+              >
+                <Text style={shS.verifyBtnTxt}>📷  TAKE PHOTO — VERIFY DRINK</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity style={shS.alertBtn} onPress={sendAlert} activeOpacity={0.8}>
               <Text style={shS.alertBtnTxt}>📍  ALERT MY FRIENDS</Text>
@@ -543,6 +686,22 @@ const shS = StyleSheet.create({
     top:0, left:0, right:0, bottom:0,
     backgroundColor: "rgba(0,0,0,0.72)",
   },
+  verifyingOverlay: {
+    position: "absolute",
+    top:0, left:0, right:0, bottom:0,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    zIndex: 1000,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  verifyingTxt: {
+    color: C.orange,
+    fontSize: 11,
+    fontFamily: MONO,
+    fontWeight: "900",
+    letterSpacing: 2,
+  },
   sheet: {
     position: "absolute",
     bottom:0, left:0, right:0,
@@ -565,6 +724,7 @@ const shS = StyleSheet.create({
   eyebrow:  { color:"#6B5E52", fontSize:9, fontFamily:MONO, letterSpacing:2, marginBottom:3 },
   title:    { color:"#F0EBE1", fontSize:20, fontFamily:MONO, fontWeight:"900", letterSpacing:3 },
   titleSub: { color:"#6B5E52", fontSize:13, letterSpacing:2, fontWeight:"400" },
+  verifyStatus: { color:"#D4622A", fontSize:8, fontFamily:MONO, letterSpacing:1.5, marginTop:6 },
   endBtn:   { borderWidth:1.5, borderColor:"#2C2520", borderRadius:2, paddingHorizontal:14, paddingVertical:8 },
   endBtnTxt:{ color:"#6B5E52", fontSize:10, fontFamily:MONO, letterSpacing:3, fontWeight:"900" },
 
@@ -589,6 +749,11 @@ const shS = StyleSheet.create({
   alertBtn:    { backgroundColor:"#161210", borderWidth:1.5, borderColor:"#D4622A", borderRadius:2,
                  paddingVertical:15, alignItems:"center", marginBottom:4 },
   alertBtnTxt: { color:"#D4622A", fontSize:12, fontFamily:MONO, fontWeight:"900", letterSpacing:2.5 },
+
+  verifyBtn:        { backgroundColor:"#161210", borderWidth:1.5, borderColor:"#D4622A", borderRadius:2,
+                      paddingVertical:14, alignItems:"center", marginBottom:8 },
+  verifyBtnTxt:     { color:"#D4622A", fontSize:11, fontFamily:MONO, fontWeight:"900", letterSpacing:2 },
+  verifyBtnDisabled:{ opacity:0.5 },
 
   empty:      { alignItems:"center", paddingVertical:28 },
   emptyDash:  { color:"#2C2520", fontSize:32, marginBottom:10 },
