@@ -48,8 +48,7 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { verifyDrinkWithGemini } from "@/lib/geminiDrinkVerification";
-import { speakText } from "@/lib/elevenlabsTTS";
+import { api } from "@/constants/api";
 
 const { width: SW } = Dimensions.get("window");
 
