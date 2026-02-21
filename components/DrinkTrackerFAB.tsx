@@ -73,7 +73,7 @@ const C = {
 const MONO = Platform.OS === "ios" ? "Courier New" : "monospace";
 
 // ─── Drink types (static + from API) ──────────────────────────────────────────
-export type DrinkOption = {
+type DrinkOption = {
   id?: string;
   label: string;
   emoji: string;
@@ -572,11 +572,7 @@ export default function DrinkTrackerFAB({
   const [sessionStart] = useState(new Date());
   const [tick, setTick] = useState(0);
 
-  // All drink options: static types + drinks from database
-  const drinkOptions: DrinkOption[] = [
-    ...DRINK_TYPES,
-    ...drinkOptionsFromApi,
-  ];
+  const drinkOptions: DrinkOption[] = [...DRINK_TYPES, ...drinkOptionsFromApi];
 
   const pulse = useRef(new Animated.Value(1)).current;
   const slideY = useRef(new Animated.Value(800)).current;
@@ -654,7 +650,7 @@ export default function DrinkTrackerFAB({
     }).start();
   }, [open]);
 
-  // Fetch drinks from database for "log a drink" section
+  // Fetch drinks from API for "log a drink" section
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -672,7 +668,6 @@ export default function DrinkTrackerFAB({
         }));
         if (!cancelled) setDrinkOptionsFromApi(options);
       } catch {
-        // Offline or API error: keep only static drinks
         if (!cancelled) setDrinkOptionsFromApi([]);
       }
     })();
@@ -835,7 +830,7 @@ export default function DrinkTrackerFAB({
     },
     [addDrink, verifying],
   );
-  function showVerifyDrinkPrompt(entry: DrinkEntry) {
+  function showVerifyDrinkPrompt(entry) {
     Alert.alert(
       "Verify your drink?",
       "Take a photo to check for signs of tampering or spoofing. If concerns are found, the drink will not be logged.",
