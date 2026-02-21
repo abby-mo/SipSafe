@@ -336,6 +336,15 @@ export default function ProfileScreen() {
   };
 
   const handleSaveProfile = useCallback(async (draft: ProfileData): Promise<boolean> => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token?.trim()) {
+      Alert.alert(
+        "Sign in required",
+        "Your session has expired or you are not signed in. Please sign in again to save your profile.",
+        [{ text: "OK", onPress: () => router.replace("/login") }],
+      );
+      return false;
+    }
     setSaving(true);
     try {
       const payload = profileDataToBackend(draft);
@@ -348,9 +357,17 @@ export default function ProfileScreen() {
       }
       return false;
     } catch (err) {
-      const message =
+      const raw =
         (err instanceof Error && err.message) || String(err).replace(/^Error:\s*/, "") || "Profile could not be updated. Try again.";
-      Alert.alert("Could not save", message);
+      const isAuthError = /authentication required|invalid or expired token/i.test(raw);
+      const message = isAuthError
+        ? "Your session may have expired. Please sign in again to save your profile."
+        : raw;
+      Alert.alert(
+        "Could not save",
+        message,
+        isAuthError ? [{ text: "OK", onPress: () => router.replace("/login") }] : undefined,
+      );
       return false;
     } finally {
       setSaving(false);
