@@ -34,6 +34,7 @@
 
 import { api } from "@/constants/api";
 import { analyzeDrinkForSpoofing } from "@/lib/drinkSpoofingDetection";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { speakText } from "@/lib/elevenlabsTTS";
 import { verifyDrinkWithGemini } from "@/lib/geminiDrinkVerification";
 import * as ImagePicker from "expo-image-picker";
@@ -114,21 +115,37 @@ const BAC_SAFE = 0.06;
 const BAC_CAUTION = 0.1;
 const BAC_DANGER = 0.15;
 
-// Replace with values from your profile context/store in a real app:
-const USER_WEIGHT_LBS = 130;
-const USER_SEX: "male" | "female" = "female";
+const DEFAULT_WEIGHT_LBS = 130;
+const DEFAULT_GENDER: "male" | "female" = "female";
 
-function calcBAC(drinks: DrinkEntry[]): number {
+type BACProfile = { weightLbs: number; gender: "male" | "female" };
+
+function calcBAC(drinks: DrinkEntry[], profile: BACProfile): number {
   if (!drinks.length) return 0;
-  const wKg = USER_WEIGHT_LBS * 0.453592;
+  const wKg = profile.weightLbs * 0.453592;
+  const r = WIDMARK_R[profile.gender];
   let bac = 0;
   for (const d of drinks) {
     const hrs = (Date.now() - d.timestamp.getTime()) / 3_600_000;
-    const peak =
-      ((d.standardDrinks * 14) / (wKg * 1000 * WIDMARK_R[USER_SEX])) * 100;
+    const peak = ((d.standardDrinks * 14) / (wKg * 1000 * r)) * 100;
     bac += peak - Math.min(peak, hrs * 0.015);
   }
   return Math.max(0, bac);
+}
+
+function labelToCategory(label: string): string {
+  const l = label.toUpperCase();
+  if (l === "BEER") return "beer";
+  if (l === "WINE") return "wine";
+  if (l === "SHOT") return "spirits";
+  if (l === "COCKTAIL") return "cocktail";
+  if (l === "SELTZER" || l === "CIDER") return "cider";
+  return "cocktail";
+}
+
+function volumeMlFromStandardDrinks(standardDrinks: number, abv: number): number {
+  if (!abv) return 355;
+  return Math.round((standardDrinks * 14 * 100) / (0.789 * abv));
 }
 
 function fmtSober(bac: number): string {
@@ -573,6 +590,10 @@ export default function DrinkTrackerFAB({
   const [sessionStart] = useState(new Date());
   const [tick, setTick] = useState(0);
   const [drinkSearchQuery, setDrinkSearchQuery] = useState("");
+  const [bacProfile, setBacProfile] = useState<BACProfile>({
+    weightLbs: DEFAULT_WEIGHT_LBS,
+    gender: DEFAULT_GENDER,
+  });
 
   const drinkOptions: DrinkOption[] = [...DRINK_TYPES, ...drinkOptionsFromApi];
   const filteredDrinkOptions = drinkSearchQuery.trim()
@@ -615,14 +636,35 @@ export default function DrinkTrackerFAB({
     }),
   ).current;
 
+  // Load user profile for BAC (from account created at registration)
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem("user");
+        if (raw) {
+          const user = JSON.parse(raw);
+          const p = user?.profile;
+          if (p && typeof p.weightLbs === "number") {
+            setBacProfile({
+              weightLbs: p.weightLbs,
+              gender: p.gender === "male" ? "male" : "female",
+            });
+          }
+        }
+      } catch {
+        // keep defaults
+      }
+    })();
+  }, []);
+
   // BAC live tick
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 60_000);
     return () => clearInterval(t);
   }, []);
   useEffect(() => {
-    setBac(calcBAC(drinks));
-  }, [drinks, tick]);
+    setBac(calcBAC(drinks, bacProfile));
+  }, [drinks, tick, bacProfile]);
 
   // FAB pulses when BAC is dangerous
   useEffect(() => {
@@ -748,6 +790,20 @@ export default function DrinkTrackerFAB({
       if (next.length % 3 === 0) setWaterNudge(true);
       return next;
     });
+    // Persist to backend so drinking is tracked per account
+    (async () => {
+      try {
+        await api.logDrink({
+          drinkId: dt.id ?? undefined,
+          drinkName: dt.label,
+          category: labelToCategory(dt.label),
+          abv: dt.abv,
+          volumeMl: volumeMlFromStandardDrinks(dt.standardDrinks, dt.abv),
+        });
+      } catch {
+        // Offline or not logged in; drink still shown locally
+      }
+    })();
   }, []);
 
   const verifyAndAddDrink = useCallback(
