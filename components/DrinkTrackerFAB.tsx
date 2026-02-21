@@ -47,6 +47,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { verifyDrinkWithGemini } from "@/lib/geminiDrinkVerification";
+import { speakText } from "@/lib/elevenlabsTTS";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -279,6 +282,7 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
   const [open, setOpen]             = useState(false);
   const [drinks, setDrinks]         = useState<DrinkEntry[]>([]);
   const [bac, setBac]               = useState(0);
+  const [verifying, setVerifying]   = useState(false);
   const [waterNudge, setWaterNudge] = useState(false);
   const [sessionStart]              = useState(new Date());
   const [tick, setTick]             = useState(0);
@@ -381,7 +385,8 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
   const addDrink = useCallback((dt: typeof DRINK_TYPES[number]) => {
     const entry: DrinkEntry = {
       id: Date.now().toString(),
-      type: dt.label, emoji: dt.emoji,
+      type: dt.label,
+      emoji: dt.emoji,
       standardDrinks: dt.standardDrinks,
       timestamp: new Date(),
     };
@@ -390,6 +395,75 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
       if (next.length % 3 === 0) setWaterNudge(true);
       return next;
     });
+  }, []);
+
+  const verifyAndAddDrink = useCallback(async (dt: typeof DRINK_TYPES[number]) => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Camera access needed",
+        "Allow camera access so Gemini can verify drink type, spoofing, and possible drugging signs.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      allowsEditing: false,
+      quality: 0.8,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0]?.base64 || verifying) return;
+
+    const mimeType = result.assets[0].mimeType;
+    const safeMimeType = mimeType === "image/png" || mimeType === "image/webp" ? mimeType : "image/jpeg";
+
+    setVerifying(true);
+    try {
+      const analysis = await verifyDrinkWithGemini(
+        result.assets[0].base64,
+        dt.label,
+        safeMimeType
+      );
+
+      await speakText(analysis.voiceMessage);
+
+      if (!analysis.allowed) {
+        const reasons: string[] = [];
+        if (!analysis.isExpectedDrinkMatch) {
+          reasons.push(`Expected ${dt.label}, but photo looked like ${analysis.matchedDrinkType}.`);
+        }
+        if (analysis.spoofingLikely) {
+          reasons.push("Possible spoofing/tampering indicators detected.");
+        }
+        if (analysis.druggingLikely) {
+          reasons.push("Possible drink spiking/drugging indicators detected.");
+        }
+        const details = [...reasons, ...analysis.concerns].join("\n");
+        Alert.alert(
+          "Verification failed",
+          `${analysis.summary}${details ? `\n\n${details}` : ""}\n\nDrink was not added.`,
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      addDrink(dt);
+      const extra = analysis.concerns.length > 0 ? `\n\nNotes:\n${analysis.concerns.join("\n")}` : "";
+      Alert.alert("Drink verified", `${analysis.summary}${extra}`, [{ text: "OK" }]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error.";
+      const friendly =
+        message.includes("model") || message.includes("404")
+          ? "Gemini model configuration failed. Try again after setting a valid Gemini model."
+          : "Gemini could not verify this drink right now. Please retake the photo.";
+      await speakText("Verification failed. I could not verify this drink.");
+      Alert.alert("Verification error", `${friendly}\n\nTechnical detail: ${message}`, [{ text: "OK" }]);
+    } finally {
+      setVerifying(false);
+    }
+  }, [addDrink, verifying]);
     Alert.alert(
       "Verify your drink?",
       "Take a photo to check for signs of tampering or spoofing. If concerns are found, the drink will not be logged.",
@@ -473,6 +547,7 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
                 SIP<Text style={{ color:C.red }}>SAFE</Text>
                 <Text style={shS.titleSub}> TRACKER</Text>
               </Text>
+              {verifying && <Text style={shS.verifyStatus}>VERIFYING PHOTO WITH GEMINI...</Text>}
             </View>
             <TouchableOpacity style={shS.endBtn} onPress={endSession}>
               <Text style={shS.endBtnTxt}>END</Text>
@@ -512,8 +587,9 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
                 <TouchableOpacity
                   key={dt.label}
                   style={shS.drinkBtn}
-                  onPress={() => addDrink(dt)}
-                  activeOpacity={0.65}
+                  onPress={() => verifyAndAddDrink(dt)}
+                  activeOpacity={verifying ? 1 : 0.65}
+                  disabled={verifying}
                 >
                   <Text style={shS.drinkEmoji}>{dt.emoji}</Text>
                   <Text style={shS.drinkName}>{dt.label}</Text>
@@ -649,6 +725,7 @@ const shS = StyleSheet.create({
   eyebrow:  { color:"#6B5E52", fontSize:9, fontFamily:MONO, letterSpacing:2, marginBottom:3 },
   title:    { color:"#F0EBE1", fontSize:20, fontFamily:MONO, fontWeight:"900", letterSpacing:3 },
   titleSub: { color:"#6B5E52", fontSize:13, letterSpacing:2, fontWeight:"400" },
+  verifyStatus: { color:"#D4622A", fontSize:8, fontFamily:MONO, letterSpacing:1.5, marginTop:6 },
   endBtn:   { borderWidth:1.5, borderColor:"#2C2520", borderRadius:2, paddingHorizontal:14, paddingVertical:8 },
   endBtnTxt:{ color:"#6B5E52", fontSize:10, fontFamily:MONO, letterSpacing:3, fontWeight:"900" },
 
