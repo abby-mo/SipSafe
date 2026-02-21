@@ -220,11 +220,7 @@ export default function ProfileScreen() {
   });
 
   const [modalVisible, setModalVisible] = useState(false);
-  
-  const handleLogout = () => {
-    // This sends the user back to the login page outside the tabs
-    router.replace("/login");
-  };
+    
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#111" />
