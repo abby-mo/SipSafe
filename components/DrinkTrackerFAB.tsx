@@ -35,7 +35,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, Platform, Alert, Animated, Dimensions, PanResponder,
+  Modal, Platform, Alert, Animated, Dimensions, PanResponder, ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { verifyDrinkWithGemini } from "@/lib/geminiDrinkVerification";
@@ -472,6 +472,12 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
         <TouchableOpacity style={shS.overlay} activeOpacity={1} onPress={() => setOpen(false)} />
 
         <Animated.View style={[shS.sheet, { transform: [{ translateY: Animated.add(slideY, dragY) }] }]}>
+          {verifying && (
+            <View style={shS.loadingOverlay}>
+              <ActivityIndicator size="large" color={C.orange} />
+              <Text style={shS.loadingText}>Analyzing drink photo...</Text>
+            </View>
+          )}
 
           {/* Drag handle — drag down to close */}
           <View style={shS.handleRow} {...panResponder.panHandlers}>
@@ -625,6 +631,21 @@ const shS = StyleSheet.create({
     borderTopWidth: 2,
     borderTopColor: "#C8321A",
     maxHeight: "90%",
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(14,11,9,0.62)",
+    gap: 10,
+  },
+  loadingText: {
+    color: "#F0EBE1",
+    fontSize: 10,
+    fontFamily: MONO,
+    letterSpacing: 1.5,
+    fontWeight: "900",
   },
   handleRow:  { alignItems:"center", paddingTop:10, paddingBottom:2 },
   handle:     { width:36, height:3, backgroundColor:"#2C2520", borderRadius:2, marginBottom:4 },
