@@ -1,5 +1,7 @@
-import { useRouter } from "expo-router"; // 1. Import router
-import React, { useState } from "react";
+import { api } from "@/constants/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -71,13 +73,19 @@ const EditModal = ({
   profile,
   onSave,
   onClose,
+  saving,
 }: {
   visible: boolean;
   profile: ProfileData;
-  onSave: (p: ProfileData) => void;
+  onSave: (p: ProfileData) => void | Promise<void | boolean>;
   onClose: () => void;
+  saving?: boolean;
 }) => {
   const [draft, setDraft] = useState<ProfileData>(profile);
+
+  React.useEffect(() => {
+    if (visible) setDraft(profile);
+  }, [visible, profile]);
 
   const update = (key: keyof ProfileData, value: string) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -105,8 +113,9 @@ const EditModal = ({
   };
 
   const handleSave = () => {
-    onSave(draft);
-    onClose();
+    void Promise.resolve(onSave(draft)).then((ok) => {
+      if (ok !== false) onClose();
+    });
   };
 
   const Field = ({
@@ -191,10 +200,16 @@ const EditModal = ({
                 <Text style={styles.addContactText}>+ Add Contact</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                <Text style={styles.saveBtnText}>Save Changes</Text>
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                <Text style={styles.saveBtnText}>
+                  {saving ? "Saving…" : "Save Changes"}
+                </Text>
               </TouchableOpacity>
-              <div style={{ height: 32 }} />
+              <View style={{ height: 32 }} />
             </ScrollView>
           </View>
         </View>
@@ -205,30 +220,170 @@ const EditModal = ({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+type BackendProfile = {
+  name?: string;
+  weightLbs?: number;
+  heightFt?: number;
+  heightIn?: number;
+  gender?: string;
+  dateOfBirth?: string | Date;
+  cell?: string;
+  address?: string;
+  bloodType?: string;
+  emergencyContacts?: { label?: string; phone?: string }[];
+};
+
+function userToProfileData(user: { email?: string; profile?: BackendProfile; id?: string } | null): ProfileData {
+  if (!user) {
+    return {
+      name: "User",
+      email: "",
+      dob: "",
+      weight: "",
+      cell: "",
+      address: "",
+      bloodType: "",
+      emergencyContacts: [],
+    };
+  }
+  const p = user.profile;
+  const dob =
+    p?.dateOfBirth instanceof Date
+      ? p.dateOfBirth.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })
+      : typeof p?.dateOfBirth === "string"
+        ? p.dateOfBirth
+        : "";
+  return {
+    name: p?.name ?? "User",
+    email: user.email ?? "",
+    dob,
+    weight: p?.weightLbs != null ? String(p.weightLbs) : "",
+    cell: p?.cell ?? "",
+    address: p?.address ?? "",
+    bloodType: p?.bloodType ?? "",
+    emergencyContacts: Array.isArray(p?.emergencyContacts)
+      ? p.emergencyContacts.map((c) => ({ label: c?.label ?? "", phone: c?.phone ?? "" }))
+      : [],
+  };
+}
+
+function profileDataToBackend(d: ProfileData): Record<string, unknown> {
+  const weight = d.weight.trim() ? parseFloat(d.weight) : undefined;
+  let dateOfBirth: string | undefined;
+  if (d.dob.trim()) {
+    const parts = d.dob.split("/");
+    if (parts.length === 3) {
+      const [mo, day, year] = parts;
+      dateOfBirth = `${year}-${mo.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    } else {
+      dateOfBirth = d.dob;
+    }
+  }
+  return {
+    name: d.name.trim() || undefined,
+    weightLbs: weight != null && !Number.isNaN(weight) ? weight : undefined,
+    dateOfBirth: dateOfBirth || undefined,
+    cell: d.cell.trim(),
+    address: d.address.trim(),
+    bloodType: d.bloodType.trim(),
+    emergencyContacts: d.emergencyContacts,
+  };
+}
+
 export default function ProfileScreen() {
-  const router = useRouter(); // 2. Initialize router
-  
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfileData>({
     name: "User",
-    email: "user@email.com",
-    dob: "01/01/2000",
-    weight: "130",
-    cell: "123-456-7890",
-    address: "Broward Hall, Gainesville FL, 32612",
-    bloodType: "O+",
-    emergencyContacts: [
-      { label: "Mom", phone: "123 456 7890" },
-      { label: "BFF", phone: "123 456 7890" },
-    ],
+    email: "",
+    dob: "",
+    weight: "",
+    cell: "",
+    address: "",
+    bloodType: "",
+    emergencyContacts: [],
   });
-
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // 3. Logout logic
-  const handleLogout = () => {
-    // This sends the user back to the login page outside the tabs
+  const loadUser = useCallback(async () => {
+    try {
+      const stored = await AsyncStorage.getItem("user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setProfile(userToProfileData(parsed));
+      }
+      const me = await api.getMe();
+      if (me?.profile != null && !me.error) {
+        const asUser = { id: me.id, email: me.email, profile: me.profile };
+        setProfile(userToProfileData(asUser));
+        await AsyncStorage.setItem("user", JSON.stringify(asUser));
+      }
+    } catch {
+      // use stored or defaults
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
+  const handleLogout = async () => {
+    await AsyncStorage.multiRemove(["token", "user"]);
     router.replace("/login");
   };
+
+  const handleSaveProfile = useCallback(async (draft: ProfileData): Promise<boolean> => {
+    const token = await AsyncStorage.getItem("token");
+    if (!token?.trim()) {
+      Alert.alert(
+        "Sign in required",
+        "Your session has expired or you are not signed in. Please sign in again to save your profile.",
+        [{ text: "OK", onPress: () => router.replace("/login") }],
+      );
+      return false;
+    }
+    setSaving(true);
+    try {
+      const payload = profileDataToBackend(draft);
+      const updated = await api.updateProfile(payload);
+      if (updated?.profile != null) {
+        const asUser = { id: updated.id, email: updated.email, profile: updated.profile };
+        setProfile(userToProfileData(asUser));
+        await AsyncStorage.setItem("user", JSON.stringify(asUser));
+        return true;
+      }
+      return false;
+    } catch (err) {
+      const raw =
+        (err instanceof Error && err.message) || String(err).replace(/^Error:\s*/, "") || "Profile could not be updated. Try again.";
+      const isAuthError = /authentication required|invalid or expired token/i.test(raw);
+      const message = isAuthError
+        ? "Your session may have expired. Please sign in again to save your profile."
+        : raw;
+      Alert.alert(
+        "Could not save",
+        message,
+        isAuthError ? [{ text: "OK", onPress: () => router.replace("/login") }] : undefined,
+      );
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <StatusBar barStyle="light-content" backgroundColor="#111" />
+        <View style={styles.loadingWrap}>
+          <Text style={styles.loadingText}>Loading profile…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -300,8 +455,9 @@ export default function ProfileScreen() {
       <EditModal
         visible={modalVisible}
         profile={profile}
-        onSave={setProfile}
+        onSave={handleSaveProfile}
         onClose={() => setModalVisible(false)}
+        saving={saving}
       />
     </SafeAreaView>
   );
@@ -430,6 +586,16 @@ const styles = StyleSheet.create({
     color: MUTED,
     fontSize: 14,
     textDecorationLine: 'underline',
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+  },
+  loadingWrap: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: MUTED,
+    fontSize: 16,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
   },
   // ── Modal Styles (No changes below) ──
