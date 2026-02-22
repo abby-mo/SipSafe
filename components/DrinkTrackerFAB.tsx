@@ -58,6 +58,7 @@ import {
     TextInput,
  
 } from "react-native";
+import { api } from "@/constants/api";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -360,19 +361,10 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
   const [bac, setBac] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [waterNudge, setWaterNudge] = useState(false);
-  const [autoAlertSent, setAutoAlertSent] = useState(false);
-  const [sessionStart] = useState(new Date());
-  const [tick, setTick] = useState(0);
-  const [drinkSearchQuery, setDrinkSearchQuery] = useState("");
-  const [bacProfile, setBacProfile] = useState<BACProfile>({ weightLbs: DEFAULT_WEIGHT_LBS, gender: DEFAULT_GENDER });
+  const [sessionStart]              = useState(new Date());
+  const [tick, setTick]             = useState(0);
 
-  const drinkOptions: DrinkOption[] = [...DRINK_TYPES, ...drinkOptionsFromApi];
-  const filteredDrinkOptions = drinkSearchQuery.trim()
-    ? drinkOptions.filter((d) => d.label.toLowerCase().includes(drinkSearchQuery.trim().toLowerCase()))
-    : drinkOptions;
-
-  const pulse = useRef(new Animated.Value(1)).current;
-  const pressAnim = useRef(new Animated.Value(1)).current; // New press animation value
+  const pulse  = useRef(new Animated.Value(1)).current;
   const slideY = useRef(new Animated.Value(800)).current;
   const dragY = useRef(new Animated.Value(0)).current;
 
@@ -504,6 +496,20 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
       Alert.alert("Verification error", "Could not verify drink.");
     } finally { setVerifying(false); }
   }, [addDrink, verifying]);
+
+  const showVerifyDrinkPrompt = useCallback(
+    (entry: { id: string }) => {
+      Alert.alert(
+        "Verify your drink?",
+        "Take a photo to check for signs of tampering or spoofing. If concerns are found, the drink will not be logged.",
+        [
+          { text: "Skip", style: "cancel" },
+          { text: "Take photo", onPress: () => promptVerifyDrink(entry.id) },
+        ]
+      );
+    },
+    [promptVerifyDrink]
+  );
 
   const endSession = () =>
     Alert.alert("END SESSION", "Clear all drinks and reset BAC?", [

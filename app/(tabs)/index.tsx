@@ -75,6 +75,7 @@ function HomePageContent({ onOpenTracker }: { onOpenTracker: () => void }) {
       style={styles.container}
       resizeMode="cover"
     >
+      {/* 1. TOP NAV PILL */}
       <View style={styles.nav}>
         <TouchableOpacity style={styles.inputPill} onPress={onOpenTracker}>
           <View style={styles.circleIcon} />
@@ -86,6 +87,7 @@ function HomePageContent({ onOpenTracker }: { onOpenTracker: () => void }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        {/* 2. SIPSAFE LOGO (above BAC) */}
         <View style={styles.logoContainer}>
           <Image
             source={require('@/assets/images/logo-sipsafe.png')}
@@ -187,7 +189,7 @@ export default function App() {
 
   return (
     <DrinkContext.Provider value={{ bac, drinks, addDrink }}>
-      <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <View style={{ flex: 1 }}>
         <StatusBar barStyle="light-content" />
         <HomePageContent onOpenTracker={() => setOpen(true)} />
 
