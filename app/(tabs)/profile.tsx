@@ -16,26 +16,24 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import {
-  DEFAULT_PROFILE,
-  type EmergencyContact,
-  type ProfileData,
-  loadProfileData,
-  saveProfileData,
-} from "@/lib/profileStorage";
 
-const CARRIER_OPTIONS = [
-  { label: "AT&T", value: "att" },
-  { label: "Verizon", value: "verizon" },
-  { label: "T-Mobile", value: "tmobile" },
-  { label: "Sprint", value: "sprint" },
-  { label: "Boost", value: "boost" },
-  { label: "Cricket", value: "cricket" },
-  { label: "US Cellular", value: "uscellular" },
-  { label: "MetroPCS", value: "metropcs" },
-  { label: "Virgin", value: "virgin" },
-  { label: "Visible", value: "visible" },
-];
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface EmergencyContact {
+  label: string;
+  phone: string;
+}
+
+interface ProfileData {
+  name: string;
+  email: string;
+  dob: string;
+  weight: string;
+  cell: string;
+  address: string;
+  bloodType: string;
+  emergencyContacts: EmergencyContact[];
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,7 +103,7 @@ const EditModal = ({
     }
     setDraft((prev) => ({
       ...prev,
-      emergencyContacts: [...prev.emergencyContacts, { label: "", phone: "", carrier: "" }],
+      emergencyContacts: [...prev.emergencyContacts, { label: "", phone: "" }],
     }));
   };
 
@@ -196,29 +194,6 @@ const EditModal = ({
                     keyboardType="phone-pad"
                     selectionColor="#D4622A"
                   />
-                  <Text style={styles.carrierLabel}>Carrier</Text>
-                  <View style={styles.carrierGrid}>
-                    {CARRIER_OPTIONS.map((carrier) => {
-                      const selected = contact.carrier === carrier.value;
-                      return (
-                        <TouchableOpacity
-                          key={`${i}-${carrier.value}`}
-                          style={[styles.carrierChip, selected && styles.carrierChipSelected]}
-                          onPress={() => updateContact(i, "carrier", carrier.value)}
-                          activeOpacity={0.8}
-                        >
-                          <Text
-                            style={[
-                              styles.carrierChipText,
-                              selected && styles.carrierChipTextSelected,
-                            ]}
-                          >
-                            {carrier.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
                 </View>
               ))}
               <TouchableOpacity style={styles.addContactBtn} onPress={addContact}>
@@ -255,7 +230,7 @@ type BackendProfile = {
   cell?: string;
   address?: string;
   bloodType?: string;
-  emergencyContacts?: { label?: string; phone?: string; carrier?: string }[];
+  emergencyContacts?: { label?: string; phone?: string }[];
 };
 
 function userToProfileData(user: { email?: string; profile?: BackendProfile; id?: string } | null): ProfileData {
@@ -287,7 +262,7 @@ function userToProfileData(user: { email?: string; profile?: BackendProfile; id?
     address: p?.address ?? "",
     bloodType: p?.bloodType ?? "",
     emergencyContacts: Array.isArray(p?.emergencyContacts)
-      ? p.emergencyContacts.map((c) => ({ label: c?.label ?? "", phone: c?.phone ?? "", carrier: c?.carrier ?? "" }))
+      ? p.emergencyContacts.map((c) => ({ label: c?.label ?? "", phone: c?.phone ?? "" }))
       : [],
   };
 }
@@ -352,14 +327,8 @@ export default function ProfileScreen() {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-    loadProfileData().then((saved) => {
-      if (mounted) setProfile(saved);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    loadUser();
+  }, [loadUser]);
 
   const handleLogout = async () => {
     await AsyncStorage.multiRemove(["token", "user"]);
@@ -458,7 +427,7 @@ export default function ProfileScreen() {
             <View style={styles.contactsRight}>
               {profile.emergencyContacts.map((c, i) => (
                 <Text key={i} style={styles.infoValue}>
-                  {c.label} – {c.phone} ({c.carrier || "carrier?"})
+                  {c.label} – {c.phone}
                 </Text>
               ))}
             </View>
@@ -676,38 +645,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     letterSpacing: 0.6,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
-  },
-  carrierLabel: {
-    color: MUTED,
-    fontSize: 12,
-    marginBottom: 6,
-    letterSpacing: 0.6,
-    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
-  },
-  carrierGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  carrierChip: {
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: "#252525",
-  },
-  carrierChipSelected: {
-    borderColor: ORANGE,
-    backgroundColor: "#2B1A11",
-  },
-  carrierChipText: {
-    color: TEXT,
-    fontSize: 12,
-    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
-  },
-  carrierChipTextSelected: {
-    color: ORANGE,
   },
   textInput: {
     backgroundColor: "#252525",
