@@ -553,18 +553,20 @@ const fabS = StyleSheet.create({
     zIndex: 999 
   },
   btn: {
-    width: 80,
+    // CHANGED: Adjusted dimensions to look more like a card
+    width: 90, 
     height: 80,
-    borderRadius: 40,
-    borderWidth: 0,           // Outline removed
+    // CHANGED: borderRadius 20 matches your dashboard statCard aesthetic
+    borderRadius: 20, 
+    borderWidth: 0,
     alignItems: "center",
     justifyContent: "center",
     
-    // THE GLOW: Since there is no border, the shadow does the heavy lifting
+    // GLOW EFFECT: Shadow remains punchy to define the square shape
     shadowColor: "#D4622A",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.9,       // Higher opacity for a punchier look
-    shadowRadius: 16,         // Wider spread to define the circular shape
+    shadowOpacity: 0.9,
+    shadowRadius: 16,
     elevation: 15,
   },
   label: { 
@@ -576,13 +578,13 @@ const fabS = StyleSheet.create({
   },
   badge: { 
     position: "absolute", 
-    top: 0, 
-    right: 0, 
+    // CHANGED: Negative offsets to make the badge "pop" off the corner
+    top: -5, 
+    right: -5, 
     backgroundColor: "#F0EBE1", 
-    borderRadius: 10, 
+    borderRadius: 8, // Square-ish badge to match the button
     paddingHorizontal: 6, 
     paddingVertical: 3, 
-    // Kept the badge border as it helps it stay readable against the button
     borderWidth: 1.5, 
     borderColor: "#D4622A", 
     zIndex: 1 

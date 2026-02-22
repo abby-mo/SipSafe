@@ -12,10 +12,13 @@ import {
 } from 'react-native';
 
 // Fonts
+import { BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
 import { InstrumentSans_400Regular } from '@expo-google-fonts/instrument-sans';
 import { Rubik_400Regular, Rubik_700Bold } from '@expo-google-fonts/rubik';
 import { RubikGlitch_400Regular, useFonts } from '@expo-google-fonts/rubik-glitch';
 import { RubikSprayPaint_400Regular } from '@expo-google-fonts/rubik-spray-paint';
+import { SpecialElite_400Regular } from '@expo-google-fonts/special-elite';
+
 
 const FEATURES = [
   {title: "AI Scanner", desc: "Identify drinks", route: "/scanner" },
@@ -116,6 +119,8 @@ export default function App() {
     'RubikSprayPaint': RubikSprayPaint_400Regular,
     'Rubik': Rubik_400Regular,
     'RubikBold': Rubik_700Bold,
+    'BebasNeue': BebasNeue_400Regular,     
+    'SpecialElite': SpecialElite_400Regular,  
   });
 
   useEffect(() => {
@@ -154,9 +159,8 @@ const styles = StyleSheet.create({
   
   bacValueSpray: { 
     color: '#fff', 
-    fontSize: 72, // Mega size for the hero element
-    fontFamily: 'RubikSprayPaint',
-    // Added a subtle glow since it's now the centerpiece
+    fontSize: 72, 
+    fontFamily: 'BebasNeue', // Changed from RubikSprayPaint
     textShadowColor: 'rgba(212, 98, 42, 0.8)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 15,
@@ -165,7 +169,7 @@ const styles = StyleSheet.create({
   bacLabelSpray: { 
     color: '#fff', 
     fontSize: 20, 
-    fontFamily: 'RubikSprayPaint', 
+    fontFamily: 'BebasNeue', 
     marginTop: -10,
     opacity: 0.6,
     letterSpacing: 2
