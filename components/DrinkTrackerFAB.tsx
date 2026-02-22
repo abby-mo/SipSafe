@@ -37,6 +37,7 @@ import { speakText } from "@/lib/elevenlabsTTS";
 import { verifyDrinkWithGemini } from "@/lib/geminiDrinkVerification";
 import { getEmergencyContactsFromStorage } from "@/lib/profileStorage";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
@@ -813,7 +814,21 @@ export default function DrinkTrackerFAB({
     ]);
 
   const sendAlert = useCallback(async () => {
-    const alertMessage = `SipSafe alert: I may need help. Current BAC estimate: ${bac.toFixed(3)}%. Time: ${new Date().toLocaleString()}.`;
+    let locationText = "Location unavailable.";
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        locationText = `Coordinates: ${lat}, ${lng}. Map: https://maps.google.com/?q=${lat},${lng}`;
+      }
+    } catch {
+      // Keep fallback location text.
+    }
+    const alertMessage = `SipSafe alert: I may need help. BAC: ${bac.toFixed(3)}%. Time: ${new Date().toLocaleString()}. ${locationText}`;
     try {
       const contacts = await getEmergencyContactsFromStorage();
       if (contacts.length === 0) {
