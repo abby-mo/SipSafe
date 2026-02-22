@@ -18,12 +18,10 @@ import {
 import { BebasNeue_400Regular, useFonts } from '@expo-google-fonts/bebas-neue';
 import { SpecialElite_400Regular } from '@expo-google-fonts/special-elite';
 
-const FEATURES = [
-  { title: "AI Scanner", desc: "Identify drinks", route: "/scanner" },
-  { title: "Dashboard", desc: "Track trends", route: "/stats" },
-  { title: "Alerts", desc: "Notify crew", route: "/alerts" },
-  { title: "Voice AI", desc: "Safety guidance", route: "/voice" },
-];
+const THEME_COLOR = '#FF4000'; 
+const WIDMARK_R = { male: 0.73, female: 0.66 };
+const USER_WEIGHT_LBS = 130;
+const USER_SEX = "female";
 
 const DRINK_TYPES = [
   { label: "BEER", emoji: "🍺", standardDrinks: 1.0 },
@@ -33,10 +31,6 @@ const DRINK_TYPES = [
   { label: "SELTZER", emoji: "🫧", standardDrinks: 0.8 },
   { label: "CIDER", emoji: "🍎", standardDrinks: 1.0 },
 ];
-
-const WIDMARK_R = { male: 0.73, female: 0.66 };
-const USER_WEIGHT_LBS = 130;
-const USER_SEX = "female";
 
 interface DrinkEntry {
   id: string;
@@ -66,15 +60,18 @@ function calcBAC(drinks: DrinkEntry[]): number {
 
 function HomePageContent({ onOpenTracker }: { onOpenTracker: () => void }) {
   const router = useRouter();
-  const { bac, drinks } = useContext(DrinkContext);
+  const { bac } = useContext(DrinkContext);
   const bacPercentage = Math.min((bac / 0.15) * 100, 100);
 
   return (
     <ImageBackground
-      source={require('@/assets/images/background.png')}
-      style={styles.container}
+      source={require('@/assets/images/sipsafe.jpg')}
+      style={styles.fullScreenBg}
       resizeMode="cover"
     >
+      {/* Dark overlay to make text readable over the photo */}
+      <View style={styles.darkOverlay} />
+
       {/* 1. TOP NAV PILL */}
       <View style={styles.nav}>
         <TouchableOpacity style={styles.inputPill} onPress={onOpenTracker}>
@@ -87,7 +84,8 @@ function HomePageContent({ onOpenTracker }: { onOpenTracker: () => void }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        {/* 2. SIPSAFE LOGO (above BAC) */}
+        
+        {/* 2. LOGO OVERLAY - Pushing content down */}
         <View style={styles.logoContainer}>
           <Image
             source={require('@/assets/images/logo-sipsafe.png')}
@@ -96,6 +94,7 @@ function HomePageContent({ onOpenTracker }: { onOpenTracker: () => void }) {
           />
         </View>
 
+        {/* 3. BAC DISPLAY - Now much lower */}
         <View style={styles.bacContainer}>
           <View style={styles.progressBarBackground}>
             <View style={[styles.progressBarFill, { width: `${bacPercentage}%` }]} />
@@ -104,15 +103,16 @@ function HomePageContent({ onOpenTracker }: { onOpenTracker: () => void }) {
           <Text style={styles.bacLabel}>EST. BAC</Text>
         </View>
 
+        {/* 4. CARDS */}
         <View style={styles.actionButtonsWrapper}>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.cardTitle}>Safe Streak</Text>
               <Text style={styles.cardValue}>14 DAYS</Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: 'rgba(26,26,26,0.85)' }]}>
-              <Text style={styles.cardTitle}>Status</Text>
-              <Text style={styles.cardValue}>{drinks.length} Drinks</Text>
+            <View style={[styles.statCard, { backgroundColor: 'rgba(26,26,26,0.7)' }]}>
+              <Text style={styles.cardTitle}>Alert</Text>
+              <Text style={styles.cardValue}>Text a friend</Text>
             </View>
           </View>
 
@@ -135,19 +135,6 @@ function HomePageContent({ onOpenTracker }: { onOpenTracker: () => void }) {
             <Text style={styles.receiptButtonText}>VIEW NIGHT'S RECEIPT</Text>
             <Text style={styles.receiptButtonArrow}>→</Text>
           </TouchableOpacity>
-
-          <View style={styles.featureGrid}>
-            {FEATURES.map((f) => (
-              <TouchableOpacity
-                key={f.title}
-                style={styles.featureCard}
-                onPress={() => router.push(f.route as any)}
-              >
-                <Text style={styles.featureTitle}>{f.title}</Text>
-                <Text style={styles.featureDesc}>{f.desc}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
       </ScrollView>
     </ImageBackground>
@@ -195,7 +182,7 @@ export default function App() {
 
   return (
     <DrinkContext.Provider value={{ bac, drinks, addDrink }}>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar barStyle="light-content" />
         <HomePageContent onOpenTracker={() => setOpen(true)} />
 
@@ -224,36 +211,108 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  nav: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 60, alignItems: 'center', justifyContent: 'space-between' },
-  inputPill: { flex: 0.9, backgroundColor: 'rgba(34,34,34,0.9)', flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 50, borderWidth: 1, borderColor: '#444' },
+  fullScreenBg: { flex: 1 },
+  darkOverlay: { 
+    ...StyleSheet.absoluteFillObject, 
+    backgroundColor: 'rgba(0,0,0,0.65)' // Adjust this to make sipsafe.jpg more or less visible
+  },
+  nav: { 
+    flexDirection: 'row', 
+    paddingHorizontal: 20, 
+    paddingTop: 60, 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    zIndex: 10 
+  },
+  inputPill: { 
+    flex: 0.9, 
+    backgroundColor: 'rgba(34,34,34,0.8)', 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 12, 
+    borderRadius: 50, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.1)' 
+  },
   circleIcon: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#555', marginRight: 10 },
-  inputPillText: { color: '#999', fontSize: 16, fontFamily: 'BebasNeue', letterSpacing: 1 },
-  navBtn: { color: '#666', fontSize: 14, fontFamily: 'BebasNeue' },
+  inputPillText: { color: '#bbb', fontSize: 16, fontFamily: 'BebasNeue', letterSpacing: 1 },
+  navBtn: { color: '#aaa', fontSize: 14, fontFamily: 'BebasNeue' },
   body: { paddingHorizontal: 20, paddingBottom: 120 },
 
-  logoContainer: { marginVertical: 24, alignItems: 'center' },
-  logoImage: { width: 220, height: 100 },
+  logoContainer: { 
+    marginTop: 20,
+    marginBottom: 100,
+    marginVertical: 40, 
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoImage: { 
+    width: 240, 
+    height: 110,
+  },
 
-  bacContainer: { alignItems: 'center', marginBottom: 25 },
-  progressBarBackground: { width: '100%', height: 12, backgroundColor: '#222', borderRadius: 6, overflow: 'hidden', marginBottom: 10 },
-  progressBarFill: { height: '100%', backgroundColor: '#ff4000' },
-  bacValue: { color: '#fff', fontSize: 65, fontFamily: 'BebasNeue', letterSpacing: -2, lineHeight: 80, textShadowColor: 'rgba(255,64,0,0.9)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 20 },
-  bacLabel: { color: '#fff', fontSize: 22, fontFamily: 'BebasNeue', marginTop: -10, opacity: 0.8, letterSpacing: 6 },
+  bacContainer: { 
+      alignItems: 'center', 
+      marginBottom: 40,
+      paddingTop: 200,        // Extra internal spacing to sink the number lower
+    },  
+    progressBarBackground: { 
+    width: '100%', 
+    height: 12, 
+    backgroundColor: 'rgba(255,255,255,0.1)', 
+    borderRadius: 6, 
+    overflow: 'hidden', 
+    marginBottom: 10 
+  },
+  progressBarFill: { height: '100%', backgroundColor: THEME_COLOR },
+  bacValue: { 
+    color: '#fff', 
+    fontSize: 70, 
+    fontFamily: 'BebasNeue', 
+    letterSpacing: -2, 
+    lineHeight: 80, 
+    textShadowColor: 'rgba(255,64,0,0.8)', 
+    textShadowOffset: { width: 0, height: 0 }, 
+    textShadowRadius: 15 
+  },
+  bacLabel: { 
+    color: '#fff', 
+    fontSize: 22, 
+    fontFamily: 'BebasNeue', 
+    marginTop: -5, 
+    opacity: 0.9, 
+    letterSpacing: 6 
+  },
 
-  actionButtonsWrapper: { marginTop: 0 },
+  actionButtonsWrapper: { marginTop: 10 },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  statCard: { backgroundColor: 'rgba(17,17,17,0.85)', width: '48%', padding: 18, borderRadius: 20, height: 110, justifyContent: 'center' },
+  statCard: { 
+    backgroundColor: 'rgba(20,20,20,0.75)', 
+    width: '48%', 
+    padding: 18, 
+    borderRadius: 20, 
+    height: 110, 
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)'
+  },
   cardTitle: { color: '#fff', fontSize: 24, fontFamily: 'BebasNeue', marginBottom: 2, letterSpacing: 1 },
-  cardValue: { color: '#666', fontSize: 18, fontFamily: 'BebasNeue', letterSpacing: 1 },
+  cardValue: { color: '#999', fontSize: 18, fontFamily: 'BebasNeue', letterSpacing: 1 },
 
-  chartCard: { backgroundColor: 'rgba(17,17,17,0.85)', borderRadius: 25, padding: 20, marginBottom: 15 },
+  chartCard: { 
+    backgroundColor: 'rgba(20,20,20,0.75)', 
+    borderRadius: 25, 
+    padding: 20, 
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)'
+  },
   chartContainer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 80, paddingHorizontal: 5 },
   chartColumn: { alignItems: 'center', flex: 1 },
-  bar: { width: 14, backgroundColor: '#ff4000', borderRadius: 2 },
+  bar: { width: 14, backgroundColor: THEME_COLOR, borderRadius: 2 },
 
   receiptButton: {
-    backgroundColor: 'rgba(17,17,17,0.85)',
+    backgroundColor: 'rgba(20,20,20,0.8)',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -261,23 +320,51 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: THEME_COLOR,
   },
-  receiptButtonText: { color: '#ff4000', fontSize: 22, fontFamily: 'BebasNeue', letterSpacing: 1 },
-  receiptButtonArrow: { color: '#ff4000', fontSize: 24 },
+  receiptButtonText: { color: THEME_COLOR, fontSize: 22, fontFamily: 'BebasNeue', letterSpacing: 1 },
+  receiptButtonArrow: { color: THEME_COLOR, fontSize: 24 },
 
-  featureGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  featureCard: { backgroundColor: 'rgba(17,17,17,0.85)', width: '48%', padding: 15, borderRadius: 20, marginBottom: 15 },
-  featureTitle: { color: '#fff', fontFamily: 'BebasNeue', fontSize: 18, marginTop: 5, letterSpacing: 1 },
-  featureDesc: { color: '#555', fontSize: 14, marginTop: 2, fontFamily: 'BebasNeue', letterSpacing: 0.5 },
-
-  fab: { position: 'absolute', bottom: 30, right: 20, backgroundColor: '#ff4000', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 15, alignItems: 'center', elevation: 5 },
+  fab: { 
+    position: 'absolute', 
+    bottom: 30, 
+    right: 20, 
+    backgroundColor: THEME_COLOR, 
+    paddingVertical: 10, 
+    paddingHorizontal: 15, 
+    borderRadius: 15, 
+    alignItems: 'center', 
+    elevation: 8,
+    shadowColor: THEME_COLOR,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 5
+  },
   fabText: { color: '#fff', fontSize: 10, fontFamily: 'BebasNeue' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)' },
-  modalSheet: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#0E0B09', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, borderTopWidth: 2, borderTopColor: '#ff4000' },
+  modalSheet: { 
+    position: 'absolute', 
+    bottom: 0, 
+    width: '100%', 
+    backgroundColor: '#0E0B09', 
+    borderTopLeftRadius: 30, 
+    borderTopRightRadius: 30, 
+    padding: 25, 
+    borderTopWidth: 2, 
+    borderTopColor: THEME_COLOR 
+  },
   modalTitle: { color: '#fff', fontFamily: 'BebasNeue', fontSize: 24, marginBottom: 20, textAlign: 'center', letterSpacing: 1 },
   drinkGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  drinkBtn: { width: '31%', backgroundColor: '#161210', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 15, borderWidth: 1, borderColor: '#222' },
+  drinkBtn: { 
+    width: '31%', 
+    backgroundColor: '#161210', 
+    padding: 15, 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    marginBottom: 15, 
+    borderWidth: 1, 
+    borderColor: '#222' 
+  },
   drinkBtnText: { color: '#fff', fontSize: 11, fontFamily: 'BebasNeue', marginTop: 8, letterSpacing: 1 },
 });
