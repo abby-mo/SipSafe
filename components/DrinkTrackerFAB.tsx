@@ -111,6 +111,7 @@ interface DrinkEntry {
   type: string;
   emoji: string;
   standardDrinks: number;
+  bacAtLog: number;
   timestamp: Date;
 }
 
@@ -467,8 +468,17 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
   const removeDrink = useCallback((id: string) => { setDrinks((prev) => prev.filter((d) => d.id !== id)); }, []);
 
   const addDrink = useCallback((dt: DrinkOption) => {
-    const entry: DrinkEntry = { id: Date.now().toString(), type: dt.label, emoji: dt.emoji, standardDrinks: dt.standardDrinks, timestamp: new Date() };
     setDrinks((prev) => {
+      const timestamp = new Date();
+      const draftEntry = {
+        id: Date.now().toString(),
+        type: dt.label,
+        emoji: dt.emoji,
+        standardDrinks: dt.standardDrinks,
+        timestamp,
+      };
+      const bacAtLog = calcBAC([draftEntry as DrinkEntry, ...prev], bacProfile);
+      const entry: DrinkEntry = { ...draftEntry, bacAtLog };
       const next = [entry, ...prev];
       if (next.length % 3 === 0) setWaterNudge(true);
       return next;
@@ -478,7 +488,7 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
         await api.logDrink({ drinkId: dt.id, drinkName: dt.label, category: labelToCategory(dt.label), abv: dt.abv, volumeMl: volumeMlFromStandardDrinks(dt.standardDrinks, dt.abv) });
       } catch {}
     })();
-  }, []);
+  }, [bacProfile]);
 
   const verifyAndAddDrink = useCallback(async (dt: DrinkOption) => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -728,15 +738,34 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
             <View style={shS.searchWrap}>
               <TextInput style={shS.searchInput} placeholder="Search drinks..." placeholderTextColor={C.muted} value={drinkSearchQuery} onChangeText={setDrinkSearchQuery} />
             </View>
-            <View style={shS.grid}>
-              {filteredDrinkOptions.map((dt) => (
-                <TouchableOpacity key={dt.id ?? dt.label} style={shS.drinkBtn} onPress={() => verifyAndAddDrink(dt)}>
-                  <Text style={shS.drinkEmoji}>{dt.emoji}</Text>
-                  <Text style={shS.drinkName}>{dt.label}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={shS.gridViewport}>
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={filteredDrinkOptions.length > 9}
+                contentContainerStyle={shS.grid}
+              >
+                {filteredDrinkOptions.map((dt) => (
+                  <TouchableOpacity key={dt.id ?? dt.label} style={shS.drinkBtn} onPress={() => verifyAndAddDrink(dt)}>
+                    <Text style={shS.drinkEmoji}>{dt.emoji}</Text>
+                    <Text style={shS.drinkName}>{dt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
             <TouchableOpacity style={shS.alertBtn} onPress={sendAlert}><Text style={shS.alertBtnTxt}>📍 ALERT MY FRIENDS</Text></TouchableOpacity>
+            <View style={shS.logSection}>
+              <Text style={shS.logTitle}>DRINK LOG</Text>
+              {drinks.length === 0 ? (
+                <Text style={shS.logEmpty}>NO DRINKS LOGGED YET.</Text>
+              ) : (
+                drinks.map((drink) => (
+                  <View key={drink.id} style={shS.logRow}>
+                    <Text style={shS.logDrink}>{drink.emoji} {drink.type}</Text>
+                    <Text style={shS.logBac}>BAC {drink.bacAtLog.toFixed(3)}%</Text>
+                  </View>
+                ))
+              )}
+            </View>
             <Text style={shS.disclaimer}>BAC IS AN ESTIMATE. NEVER DRIVE IMPAIRED.</Text>
             <View style={{ height: 48 }} />
           </ScrollView>
@@ -817,11 +846,18 @@ const shS = StyleSheet.create({
   content: { padding: 14 },
   searchWrap: { marginBottom: 12 },
   searchInput: { backgroundColor: "#1E1A17", borderWidth: 1, borderColor: "#2C2520", borderRadius: 2, paddingHorizontal: 14, paddingVertical: 12, color: "#F0EBE1", fontSize: 14, fontFamily: MONO },
+  gridViewport: { maxHeight: 260, marginBottom: 14 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
   drinkBtn: { width: (SW - 52) / 3, backgroundColor: "#161210", borderRadius: 2, borderWidth: 1, borderColor: "#2C2520", alignItems: "center", paddingVertical: 14 },
   drinkEmoji: { fontSize: 24, marginBottom: 5 },
   drinkName: { color: "#F0EBE1", fontSize: 9, fontFamily: MONO, fontWeight: "900", textAlign: "center" },
   alertBtn: { backgroundColor: "#161210", borderWidth: 1.5, borderColor: "#ff4000", borderRadius: 2, paddingVertical: 15, alignItems: "center" },
   alertBtnTxt: { color: "#ff4000", fontSize: 12, fontFamily: MONO, fontWeight: "900", letterSpacing: 2.5 },
+  logSection: { marginTop: 12, backgroundColor: "#161210", borderWidth: 1, borderColor: "#2C2520", borderRadius: 2, padding: 12 },
+  logTitle: { color: "#F0EBE1", fontSize: 10, fontFamily: MONO, fontWeight: "900", letterSpacing: 1.5, marginBottom: 8 },
+  logEmpty: { color: "#6B5E52", fontSize: 10, fontFamily: MONO },
+  logRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#2C2520" },
+  logDrink: { color: "#F0EBE1", fontSize: 10, fontFamily: MONO, fontWeight: "700" },
+  logBac: { color: "#ff4000", fontSize: 10, fontFamily: MONO, fontWeight: "900" },
   disclaimer: { color: "#2C2520", fontSize: 8, fontFamily: MONO, textAlign: "center", marginTop: 20 },
 });

@@ -180,7 +180,13 @@ export default function App() {
   }, [open]);
 
   const addDrink = (dt: (typeof DRINK_TYPES)[number]) => {
-    const entry = { id: Date.now().toString(), ...dt, timestamp: new Date() } as DrinkEntry;
+    const entry: DrinkEntry = {
+      id: Date.now().toString(),
+      type: dt.label,
+      emoji: dt.emoji,
+      standardDrinks: dt.standardDrinks,
+      timestamp: new Date(),
+    };
     setDrinks((prev) => [entry, ...prev]);
     setOpen(false);
   };
