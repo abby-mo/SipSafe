@@ -37,8 +37,6 @@ import { speakText } from "@/lib/elevenlabsTTS";
 import { verifyDrinkWithGemini } from "@/lib/geminiDrinkVerification";
 import { getEmergencyContactsFromStorage } from "@/lib/profileStorage";
 import { api } from "@/constants/api";
-import { speakText } from "@/lib/elevenlabsTTS";
-import { verifyDrinkWithGemini } from "@/lib/geminiDrinkVerification";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -506,77 +504,6 @@ export default function DrinkTrackerFAB({ children }: { children: React.ReactNod
       Alert.alert("Verification error", "Could not verify drink.");
     } finally { setVerifying(false); }
   }, [addDrink, verifying]);
-
-  const endSession = () => Alert.alert("END SESSION", "Clear all drinks?", [
-    { text: "CANCEL", style: "cancel" },
-    { text: "RESET", style: "destructive", onPress: () => { setDrinks([]); setOpen(false); } }
-  ]);
-
-  const sendAlert = () => Alert.alert("ALERT SENT", "Emergency contacts notified.");
-
-        await speakText(analysis.voiceMessage);
-
-        if (!analysis.allowed) {
-          const reasons: string[] = [];
-          if (!analysis.isExpectedDrinkMatch) {
-            reasons.push(
-              `Expected ${dt.label}, but photo looked like ${analysis.matchedDrinkType}.`,
-            );
-          }
-          if (analysis.spoofingLikely) {
-            reasons.push("Possible spoofing/tampering indicators detected.");
-          }
-          if (analysis.druggingLikely) {
-            reasons.push(
-              "Possible drink spiking/drugging indicators detected.",
-            );
-          }
-          const details = [...reasons, ...analysis.concerns].join("\n");
-          Alert.alert(
-            "Verification failed",
-            `${analysis.summary}${details ? `\n\n${details}` : ""}\n\nDrink was not added.`,
-            [{ text: "OK" }],
-          );
-          return;
-        }
-
-        addDrink(dt);
-        const extra =
-          analysis.concerns.length > 0
-            ? `\n\nNotes:\n${analysis.concerns.join("\n")}`
-            : "";
-        Alert.alert("Drink verified", `${analysis.summary}${extra}`, [
-          { text: "OK" },
-        ]);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error.";
-        const friendly =
-          message.includes("model") || message.includes("404")
-            ? "Gemini model configuration failed. Try again after setting a valid Gemini model."
-            : "Gemini could not verify this drink right now. Please retake the photo.";
-        await speakText("Verification failed. I could not verify this drink.");
-        Alert.alert(
-          "Verification error",
-          `${friendly}\n\nTechnical detail: ${message}`,
-          [{ text: "OK" }],
-        );
-      } finally {
-        setVerifying(false);
-      }
-    },
-    [addDrink, verifying],
-  );
-  function showVerifyDrinkPrompt(entry: DrinkEntry) {
-    Alert.alert(
-      "Verify your drink?",
-      "Take a photo to check for signs of tampering or spoofing. If concerns are found, the drink will not be logged.",
-      [
-        { text: "Skip", style: "cancel" },
-        { text: "Take photo", onPress: () => promptVerifyDrink(entry.id) },
-      ],
-    );
-  }
 
   const endSession = () =>
     Alert.alert("END SESSION", "Clear all drinks and reset BAC?", [

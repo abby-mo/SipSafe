@@ -1,5 +1,3 @@
-import { useRouter } from "expo-router"; // 1. Import router
-import React, { useEffect, useState } from "react";
 import { api } from "@/constants/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
@@ -257,7 +255,7 @@ type BackendProfile = {
   cell?: string;
   address?: string;
   bloodType?: string;
-  emergencyContacts?: { label?: string; phone?: string }[];
+  emergencyContacts?: { label?: string; phone?: string; carrier?: string }[];
 };
 
 function userToProfileData(user: { email?: string; profile?: BackendProfile; id?: string } | null): ProfileData {
@@ -289,7 +287,7 @@ function userToProfileData(user: { email?: string; profile?: BackendProfile; id?
     address: p?.address ?? "",
     bloodType: p?.bloodType ?? "",
     emergencyContacts: Array.isArray(p?.emergencyContacts)
-      ? p.emergencyContacts.map((c) => ({ label: c?.label ?? "", phone: c?.phone ?? "" }))
+      ? p.emergencyContacts.map((c) => ({ label: c?.label ?? "", phone: c?.phone ?? "", carrier: c?.carrier ?? "" }))
       : [],
   };
 }
@@ -362,17 +360,6 @@ export default function ProfileScreen() {
       mounted = false;
     };
   }, []);
-
-  const handleSaveProfile = async (nextProfile: ProfileData) => {
-    setProfile(nextProfile);
-    await saveProfileData(nextProfile);
-  };
-
-  // 3. Logout logic
-  const handleLogout = () => {
-    // This sends the user back to the login page outside the tabs
-    loadUser();
-  }, [loadUser]);
 
   const handleLogout = async () => {
     await AsyncStorage.multiRemove(["token", "user"]);
